@@ -1,2 +1,3 @@
 # berry-battler
-Template for a Berry Battle combatant that executes on a Raspberry Pi 5 and makes decisions for individual units in a  Berry Battle simulation.
+Berry Battler is a user defined application that uses AI algorithm(s) executing on a Raspberry Pi device to compete against others in a game simulation.
+
