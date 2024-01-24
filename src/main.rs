@@ -22,7 +22,7 @@ impl UpdateGameState for UpdateGameStateService {
         mut request: Request<UpdateStateRequest>,
     ) -> Result<Response<UpdatedStateResponse>, Status> {
         println!("Got a request from {:?}", request.remote_addr());
-        let updated_state = battler_logic(request.get_mut());
+        let updated_state = simulate_game_update(request.get_mut());
 
         Ok(Response::new(updated_state))
     }
@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn battler_logic(current_state: &UpdateStateRequest) -> UpdatedStateResponse {
+fn simulate_game_update(current_state: &UpdateStateRequest) -> UpdatedStateResponse {
     let mut rng = rand::thread_rng();
     let start_time = Instant::now();
 
@@ -75,6 +75,6 @@ fn battler_logic(current_state: &UpdateStateRequest) -> UpdatedStateResponse {
         update_id: current_state.update_id,
         units: updated_units,
         multiplier: current_state.multiplier,
-        single_pass_elapsed_time: u64::try_from(parsing_elapsed.as_micros()).unwrap(),
+        single_pass_elapsed_time_us: u64::try_from(parsing_elapsed.as_micros()).unwrap(),
     }
 }
