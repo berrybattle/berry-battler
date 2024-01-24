@@ -5,7 +5,7 @@ use game_server::{
 };
 use rand::Rng;
 use std::thread;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tonic::{transport::Server, Request, Response, Status};
 
 pub mod game_server {
@@ -22,9 +22,7 @@ impl UpdateGameState for UpdateGameStateService {
         mut request: Request<UpdateStateRequest>,
     ) -> Result<Response<UpdatedStateResponse>, Status> {
         println!("Got a request from {:?}", request.remote_addr());
-        let updated_state = simulate_game_update(request.get_mut());
-
-        Ok(Response::new(updated_state))
+        Ok(Response::new(simulate_game_update(request.get_mut())))
     }
 }
 
@@ -45,8 +43,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn simulate_game_update(current_state: &UpdateStateRequest) -> UpdatedStateResponse {
     let mut rng = rand::thread_rng();
-    let start_time = Instant::now();
 
+    let start_time = Instant::now();
     let updated_units: Vec<UnitState> = current_state
         .units
         .iter()
@@ -66,15 +64,18 @@ fn simulate_game_update(current_state: &UpdateStateRequest) -> UpdatedStateRespo
         })
         .collect();
 
+    // Simulate running a pathing algorithm like A*
+    let proc_duration = Duration::from_nanos(
+        current_state.per_unit_proc_time_ns * current_state.units.len() as u64,
+    );
+    thread::sleep(proc_duration);
     let parsing_elapsed = start_time.elapsed();
-    // Simulate processing more expensive work
-    thread::sleep(parsing_elapsed * current_state.multiplier);
 
     UpdatedStateResponse {
         updated_status: UpdateStatus::Finished as i32,
         update_id: current_state.update_id,
         units: updated_units,
-        multiplier: current_state.multiplier,
+        per_unit_proc_time_ns: current_state.per_unit_proc_time_ns,
         single_pass_elapsed_time_us: u64::try_from(parsing_elapsed.as_micros()).unwrap(),
     }
 }
