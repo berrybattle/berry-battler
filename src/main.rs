@@ -1,6 +1,11 @@
 use game_server::update_game_state_server::{UpdateGameState, UpdateGameStateServer};
-use game_server::{UpdateStateRequest, UpdateStatus, UpdatedStateResponse};
-use prost_types::Timestamp;
+use game_server::{
+    UnitDirectionVector, UnitPosition, UnitState, UpdateStateRequest, UpdateStatus,
+    UpdatedStateResponse,
+};
+use rand::Rng;
+use std::thread;
+use std::time::Instant;
 use tonic::{transport::Server, Request, Response, Status};
 
 pub mod game_server {
@@ -14,20 +19,12 @@ pub struct UpdateGameStateService {}
 impl UpdateGameState for UpdateGameStateService {
     async fn update(
         &self,
-        request: Request<UpdateStateRequest>,
+        mut request: Request<UpdateStateRequest>,
     ) -> Result<Response<UpdatedStateResponse>, Status> {
         println!("Got a request from {:?}", request.remote_addr());
+        let updated_state = battler_logic(request.get_mut());
 
-        let mut processed_data = request.get_ref().data.clone();
-        processed_data.push_str("_processed");
-        let reply = UpdatedStateResponse {
-            //message: format!("Hello {}!", request.get_ref().name),
-            updated_status: UpdateStatus::Finished as i32,
-            update_id: request.get_ref().update_id.clone(),
-            timestamp: Some(Timestamp::default()),
-            updated_data: processed_data,
-        };
-        Ok(Response::new(reply))
+        Ok(Response::new(updated_state))
     }
 }
 
@@ -37,11 +34,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Server listening on {}", addr);
 
-    let say = UpdateGameStateService::default();
+    let update = UpdateGameStateService::default();
     Server::builder()
-        .add_service(UpdateGameStateServer::new(say))
+        .add_service(UpdateGameStateServer::new(update))
         .serve(addr)
         .await?;
 
     Ok(())
+}
+
+fn battler_logic(current_state: &UpdateStateRequest) -> UpdatedStateResponse {
+    let mut rng = rand::thread_rng();
+    let start_time = Instant::now();
+
+    let updated_units: Vec<UnitState> = current_state
+        .units
+        .iter()
+        .map(|unit| UnitState {
+            id: unit.id,
+            unit_type: unit.unit_type,
+            position: Some(UnitPosition {
+                x: rng.gen::<f32>(),
+                y: rng.gen::<f32>(),
+                layer: rng.gen::<u32>(),
+                direction: Some(UnitDirectionVector {
+                    x: rng.gen::<f32>(),
+                    y: rng.gen::<f32>(),
+                }),
+            }),
+            tag: "Updated Unit Tag".to_string(),
+        })
+        .collect();
+
+    let parsing_elapsed = start_time.elapsed();
+    // Simulate processing more expensive work
+    thread::sleep(parsing_elapsed * current_state.multiplier);
+
+    UpdatedStateResponse {
+        updated_status: UpdateStatus::Finished as i32,
+        update_id: current_state.update_id,
+        units: updated_units,
+        multiplier: current_state.multiplier,
+        single_pass_elapsed_time: u64::try_from(parsing_elapsed.as_micros()).unwrap(),
+    }
 }
