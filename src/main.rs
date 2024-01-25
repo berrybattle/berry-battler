@@ -1,26 +1,25 @@
-use game_server::update_game_state_server::{UpdateGameState, UpdateGameStateServer};
-use game_server::{
-    UnitDirectionVector, UnitPosition, UnitState, UpdateStateRequest, UpdateStatus,
-    UpdatedStateResponse,
+use bb_grpc::update_service_server::{UpdateService, UpdateServiceServer};
+use bb_grpc::{
+    UnitDirectionVector, UnitPosition, UnitState, UpdateRpcRequest, UpdateRpcResponse, UpdateStatus,
 };
 use rand::Rng;
 use std::thread;
 use std::time::{Duration, Instant};
 use tonic::{transport::Server, Request, Response, Status};
 
-pub mod game_server {
-    tonic::include_proto!("game_server");
+pub mod bb_grpc {
+    tonic::include_proto!("bb_grpc");
 }
 
 #[derive(Default)]
-pub struct UpdateGameStateService {}
+pub struct UpdateServiceTraitWrapper {}
 
 #[tonic::async_trait]
-impl UpdateGameState for UpdateGameStateService {
-    async fn update(
+impl UpdateService for UpdateServiceTraitWrapper {
+    async fn update_rpc(
         &self,
-        mut request: Request<UpdateStateRequest>,
-    ) -> Result<Response<UpdatedStateResponse>, Status> {
+        mut request: Request<UpdateRpcRequest>,
+    ) -> Result<Response<UpdateRpcResponse>, Status> {
         println!("Got a request from {:?}", request.remote_addr());
         Ok(Response::new(simulate_game_update(request.get_mut())))
     }
@@ -32,16 +31,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Server listening on {}", addr);
 
-    let update = UpdateGameStateService::default();
+    let update_rpc = UpdateServiceTraitWrapper::default();
     Server::builder()
-        .add_service(UpdateGameStateServer::new(update))
+        .add_service(UpdateServiceServer::new(update_rpc))
         .serve(addr)
         .await?;
 
     Ok(())
 }
 
-fn simulate_game_update(current_state: &UpdateStateRequest) -> UpdatedStateResponse {
+fn simulate_game_update(current_state: &UpdateRpcRequest) -> UpdateRpcResponse {
     let mut rng = rand::thread_rng();
 
     let start_time = Instant::now();
@@ -71,7 +70,7 @@ fn simulate_game_update(current_state: &UpdateStateRequest) -> UpdatedStateRespo
     thread::sleep(proc_duration);
     let parsing_elapsed = start_time.elapsed();
 
-    UpdatedStateResponse {
+    UpdateRpcResponse {
         updated_status: UpdateStatus::Finished as i32,
         update_id: current_state.update_id,
         units: updated_units,
